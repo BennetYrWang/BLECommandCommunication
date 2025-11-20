@@ -1,5 +1,4 @@
 #pragma once
-#include <Arduino.h>
 
 /**
  * @struct BLEConfig
@@ -24,9 +23,6 @@ struct BLEConfig {
 
     /** 命令特征 UUID（central 向设备写命令的通道）。 */
     String commandUuid;
-
-    /** 自动心跳/自动 ping 的时间间隔（毫秒）。用于连接维持或健康检查。 */
-    unsigned long autoPingInterval;
 
     // 任意数量的你希望增加的东西
 };

@@ -1,162 +1,66 @@
-# BLEManager Usage Guide
+# BLE Command Communication
 
-This project provides a lightweight BLE manager designed to simplify BLE communication on Arduino/ESP32.
-It handles BLE initialization, service/characteristic setup, connection tracking, message formatting, and sending commands with an automatic timestamp system.
-
-You only need minimal code to get BLE running.
-
-------------------------------------------------------------
+## Overview
+This project demonstrates a Bluetooth Low Energy (BLE) communication system designed for Arduino-based devices. It allows a peripheral device to communicate with a central device by sending and receiving commands over BLE.
 
 ## Features
+- **Dynamic Configuration**: BLE parameters such as device name, UUIDs, and MTU size are configurable using the `BLEConfig` struct.
+- **Command Handling**: Commands are processed via hardcoded string comparisons in the `onCommandReceived` method.
+- **BLE Service and Characteristics**: Implements a BLE service with two characteristics:
+  - **Command Characteristic**: Allows the central device to send commands to the peripheral.
+  - **Sensor Data Characteristic**: Sends responses or data from the peripheral to the central device.
 
-- Easy BLE initialization using a single config structure
-- Automatic service and characteristic creation
-- Automatic connection state tracking
-- Automatic timestamp injection when sending commands
-- Unified message protocol:
+## File Structure
+- **`BLECommandCommunication.ino`**: The main Arduino sketch that initializes and runs the BLE system.
+- **`BLECommandHandler.cpp` and `.h`**: Contains the logic for BLE setup, communication, and command handling.
+- **`BLEConfig.h`**: Defines the `BLEConfig` struct for configuring BLE parameters.
 
-    commandName:timestamp:payload
+## How to Use
+1. **Setup BLE Configuration**:
+   In the `setup()` function of `BLECommandCommunication.ino`, initialize a `BLEConfig` struct with the desired parameters:
+   ```cpp
+   BLEConfig config;
+   config.deviceName = "MyBLEDevice";
+   config.mtuSize = 512;
+   config.sendIntervalMs = 100;
+   config.serviceUuid = "19B10000-E8F2-537E-4F6C-D104768A1214";
+   config.sensorUuid = "19B10002-E8F2-537E-4F6C-D104768A1214";
+   config.commandUuid = "19B10001-E8F2-537E-4F6C-D104768A1214";
+   ```
 
-- Command write events are supported — you can attach your own handler logic inside the manager (handler not included here; add your own implementation).
+2. **Initialize BLE**:
+   Pass the `BLEConfig` struct to the `setup` method of `BLECommandHandler`:
+   ```cpp
+   if (!BLECommandHandler::getInstance()->setup(config)) {
+       Serial.println("Starting BLE failed!");
+       while (1);
+   }
+   ```
 
-------------------------------------------------------------
+3. **Handle BLE Events**:
+   Call the `update` method in the `loop()` function to process BLE events:
+   ```cpp
+   void loop() {
+       BLECommandHandler::getInstance()->update();
+   }
+   ```
 
-## 1. BLEConfig Setup
+4. **Customize Command Handling**:
+   Modify the `onCommandReceived` method in `BLECommandHandler.cpp` to handle specific commands:
+   ```cpp
+   void BLECommandHandler::onCommandReceived(const String& cmd) {
+       if (cmd == "TEST") {
+           sendCommand("RECEIVED_TEST");
+       }
+   }
+   ```
 
-Create and fill a BLEConfig structure:
+## Notes
+- Ensure the UUIDs in the `BLEConfig` struct match those expected by your BLE central device.
+- The `onCommandReceived` method currently uses hardcoded string comparisons for simplicity. You can extend this to use a more dynamic approach if needed.
 
-    BLEConfig cfg;
-    cfg.deviceName        = "Arduino Nano ESP32 BLE";
-    cfg.mtuSize           = 128;
-    cfg.sendIntervalMs    = 10;
-    cfg.serviceUuid       = "12345678-1234-5678-1234-56789abcdef0";
-    cfg.sensorUuid        = "12345678-1234-5678-1234-56789abcdef1";
-    cfg.commandUuid       = "12345678-1234-5678-1234-56789abcdef2";
-    cfg.autoPingInterval  = 3000;
+## Dependencies
+- **ArduinoBLE Library**: Ensure the ArduinoBLE library is installed in your Arduino IDE.
 
-### Config Fields
-
-| Field             | Description                                      |
-|-------------------|--------------------------------------------------|
-| deviceName        | BLE device name shown during scanning            |
-| mtuSize           | Desired MTU size                                 |
-| sendIntervalMs    | Minimum delay between message sends              |
-| serviceUuid       | Primary BLE service UUID                         |
-| sensorUuid        | Characteristic used for sending data             |
-| commandUuid       | Characteristic used for receiving commands       |
-| autoPingInterval  | Automatic heartbeat interval (ms)                |
-
-------------------------------------------------------------
-
-## 2. Initialize BLEManager
-
-Declare the manager:
-
-    BLEManager ble;
-
-Initialize in setup():
-
-    ble.initialize(cfg);
-
-This automatically:
-
-- Starts BLE
-- Creates the service and characteristics
-- Registers write callbacks
-- Begins advertising
-- Handles MTU negotiation
-
-------------------------------------------------------------
-
-## 3. Call update() in the Main Loop
-
-update() maintains BLE state and processes events.
-
-    void loop() {
-        ble.update();
-    }
-
-------------------------------------------------------------
-
-## 4. Sending Commands
-
-Use sendCommand(name, payload):
-
-    ble.sendCommand("ping", "");
-
-Messages follow the protocol:
-
-    commandName:timestamp:payload
-
-Example:
-
-    HIT:1731812281:LeftSensor
-
-Timestamp is generated automatically.
-
-------------------------------------------------------------
-
-## 5. Connection Check
-
-    if (ble.checkConnection()) {
-        ble.sendCommand("ping", "");
-    }
-
-------------------------------------------------------------
-
-## 6. Command Handling (Optional)
-
-The manager supports command-write events.
-
-You can add your own handler logic inside:
-
-    onCommandWritten()
-
-Handler code is not included here — implement your own parsing or routing.
-
-------------------------------------------------------------
-
-## 7. Minimal Working Example
-
-    #include <ArduinoBLE.h>
-    #include "BLEManager.h"
-    #include "BLEConfig.h"
-
-    BLEManager ble;
-    BLEConfig cfg;
-
-    void setup() {
-        Serial.begin(115200);
-
-        cfg.deviceName        = "Arduino Nano ESP32 BLE";
-        cfg.mtuSize           = 128;
-        cfg.sendIntervalMs    = 10;
-        cfg.serviceUuid       = "12345678-1234-5678-1234-56789abcdef0";
-        cfg.sensorUuid        = "12345678-1234-5678-1234-56789abcdef1";
-        cfg.commandUuid       = "12345678-1234-5678-1234-56789abcdef2";
-        cfg.autoPingInterval  = 3000;
-
-        ble.initialize(cfg);
-    }
-
-    void loop() {
-        ble.update();
-
-        if (ble.checkConnection()) {
-            ble.sendCommand("ping", "");
-        }
-
-        delay(1000);
-    }
-
-------------------------------------------------------------
-
-## Summary
-
-1. Create a BLEConfig
-2. Call ble.initialize(cfg)
-3. Call ble.update() in your loop
-4. Send messages using sendCommand(name, payload)
-5. Add optional command handlers if needed
-
-This keeps BLE usage clean, simple, and modular.
+## License
+This project is licensed under the MIT License. See the `LICENSE` file for details.
